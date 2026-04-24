@@ -1,13 +1,17 @@
 import { redirect } from "next/navigation";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { Dashboard } from "@/components/dashboard";
-import { isAllowedAdmin } from "@/lib/auth";
+import { hasAdminEmailConfig, isAllowedAdmin } from "@/lib/auth";
 import { ensureDefaultCategories, getInventoryData } from "@/lib/data";
 import { hasSupabaseConfig } from "@/lib/env";
 
 export default async function Home() {
   if (!hasSupabaseConfig()) {
-    return <SetupNotice />;
+    return <SetupNotice type="supabase" />;
+  }
+
+  if (!hasAdminEmailConfig()) {
+    return <SetupNotice type="admin" />;
   }
 
   const supabase = await createServerSupabaseClient();
@@ -40,15 +44,20 @@ export default async function Home() {
   return <Dashboard initialData={data} userEmail={user.email ?? ""} />;
 }
 
-function SetupNotice() {
+function SetupNotice({ type }: { type: "supabase" | "admin" }) {
+  const isAdminConfig = type === "admin";
+
   return (
     <main className="auth-shell">
       <section className="auth-card">
-        <p className="eyebrow">Supabase Cloud Setup</p>
-        <h1>先连接 Supabase 云端项目</h1>
+        <p className="eyebrow">{isAdminConfig ? "Admin Setup" : "Supabase Cloud Setup"}</p>
+        <h1>{isAdminConfig ? "先配置管理员邮箱" : "先连接 Supabase 云端项目"}</h1>
         <p className="subtle">
-          这个应用不会在本地部署数据库。请在 Supabase 免费云端项目里执行
-          <code> supabase/schema.sql </code>，然后把项目 URL、匿名 key 和管理员邮箱填入
+          {isAdminConfig
+            ? "为了避免后台在生产环境被误开放，请先配置 ADMIN_EMAIL。"
+            : "这个应用不会在本地部署数据库。请在 Supabase 免费云端项目里执行"}
+          {!isAdminConfig ? <code> supabase/schema.sql </code> : null}
+          {!isAdminConfig ? "，然后把项目 URL、匿名 key 和管理员邮箱填入" : null}
           <code> .env.local </code>。
         </p>
         <pre className="notice">{`NEXT_PUBLIC_SUPABASE_URL=...

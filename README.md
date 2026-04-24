@@ -17,3 +17,7 @@ npm run dev
 ## 环境变量
 
 见 `.env.example`。
+
+## 详细说明和部署
+
+见 `docs/APP_AND_DEPLOYMENT.md`。

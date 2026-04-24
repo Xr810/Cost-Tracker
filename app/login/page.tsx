@@ -2,9 +2,10 @@ import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/login-form";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { hasSupabaseConfig } from "@/lib/env";
+import { hasAdminEmailConfig } from "@/lib/auth";
 
 export default async function LoginPage() {
-  if (!hasSupabaseConfig()) {
+  if (!hasSupabaseConfig() || !hasAdminEmailConfig()) {
     redirect("/");
   }
 

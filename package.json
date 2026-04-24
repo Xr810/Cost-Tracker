@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint app components lib middleware.ts next.config.ts eslint.config.mjs --max-warnings=0",
+    "test": "node --test tests/*.test.cjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

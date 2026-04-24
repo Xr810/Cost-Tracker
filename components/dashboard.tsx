@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import {
   Download,
   FileUp,
@@ -23,6 +24,7 @@ import {
 import { computeItem, summarizeItems } from "@/lib/calculations";
 import { exportInventoryMarkdown } from "@/lib/markdown";
 import { centsToYuan, formatDateInput, formatYuan } from "@/lib/format";
+import type { ActionResult } from "@/lib/action-result";
 import { ITEM_STATUSES, PRICING_METHODS, type Category, type InventoryData, type InventoryItem } from "@/lib/types";
 
 type DialogState =
@@ -281,13 +283,22 @@ function ItemForm({
   onDone: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState("");
+  const router = useRouter();
 
   return (
     <form
       action={(formData) => {
+        setError("");
         startTransition(async () => {
-          await upsertItemAction(formData);
-          onDone();
+          const result = await upsertItemAction(formData);
+          if (result.ok) {
+            router.refresh();
+            onDone();
+            return;
+          }
+
+          setError(result.error);
         });
       }}
     >
@@ -359,19 +370,29 @@ function ItemForm({
           {isPending ? "保存中..." : "保存"}
         </button>
       </div>
+      {error ? <p className="error">{error}</p> : null}
     </form>
   );
 }
 
 function CategoryForm({ category, onDone }: { category?: Category; onDone: () => void }) {
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState("");
+  const router = useRouter();
 
   return (
     <form
       action={(formData) => {
+        setError("");
         startTransition(async () => {
-          await upsertCategoryAction(formData);
-          onDone();
+          const result = await upsertCategoryAction(formData);
+          if (result.ok) {
+            router.refresh();
+            onDone();
+            return;
+          }
+
+          setError(result.error);
         });
       }}
     >
@@ -392,20 +413,30 @@ function CategoryForm({ category, onDone }: { category?: Category; onDone: () =>
           {isPending ? "保存中..." : "保存"}
         </button>
       </div>
+      {error ? <p className="error">{error}</p> : null}
     </form>
   );
 }
 
 function ImportForm({ onDone }: { onDone: () => void }) {
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState("");
+  const router = useRouter();
 
   return (
     <form
       className="import-export"
       action={(formData) => {
+        setError("");
         startTransition(async () => {
-          await importMarkdownAction(formData);
-          onDone();
+          const result = await importMarkdownAction(formData);
+          if (result.ok) {
+            router.refresh();
+            onDone();
+            return;
+          }
+
+          setError(result.error);
         });
       }}
     >
@@ -417,6 +448,7 @@ function ImportForm({ onDone }: { onDone: () => void }) {
           {isPending ? "导入中..." : "导入"}
         </button>
       </div>
+      {error ? <p className="error">{error}</p> : null}
     </form>
   );
 }
@@ -463,24 +495,42 @@ function DeleteButton({
   label,
   compact,
 }: {
-  action: (formData: FormData) => Promise<void>;
+  action: (formData: FormData) => Promise<ActionResult>;
   id: string;
   label: string;
   compact?: boolean;
 }) {
+  const [isPending, startTransition] = useTransition();
+  const router = useRouter();
+
   return (
-    <form action={action}>
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+
+        if (!window.confirm(`${label}？这个操作不可撤销。`)) {
+          return;
+        }
+
+        const formData = new FormData(event.currentTarget);
+        startTransition(async () => {
+          const result = await action(formData);
+          if (result.ok) {
+            router.refresh();
+            return;
+          }
+
+          window.alert(result.error);
+        });
+      }}
+    >
       <input type="hidden" name="id" value={id} />
       <button
         className="icon-button"
         style={compact ? { minHeight: 28, padding: "0 8px" } : undefined}
         title={label}
         type="submit"
-        onClick={(event) => {
-          if (!window.confirm(`${label}？这个操作不可撤销。`)) {
-            event.preventDefault();
-          }
-        }}
+        disabled={isPending}
       >
         <Trash2 size={compact ? 13 : 15} />
       </button>

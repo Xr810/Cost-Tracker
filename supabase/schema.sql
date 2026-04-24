@@ -7,24 +7,29 @@ create table if not exists public.categories (
   icon text,
   sort_order integer not null default 0,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint categories_user_id_id_key unique (user_id, id)
 );
 
 create table if not exists public.items (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
-  category_id uuid not null references public.categories(id) on delete cascade,
+  category_id uuid not null,
   name text not null,
   purchase_date date,
-  amount_cents integer not null default 0,
+  amount_cents integer not null default 0 check (amount_cents >= 0),
   status text not null check (status in ('观望中', '持有中', '已退役', '咸鱼ing', '已卖出')),
   pricing_method text not null check (pricing_method in ('按天', '按次')),
   usage_count integer not null default 0 check (usage_count >= 0),
-  sale_amount_cents integer not null default 0,
+  sale_amount_cents integer not null default 0 check (sale_amount_cents >= 0),
   retired_date date,
   notes text,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint items_user_category_fk
+    foreign key (user_id, category_id)
+    references public.categories(user_id, id)
+    on delete restrict
 );
 
 create index if not exists categories_user_id_idx on public.categories(user_id);
@@ -83,13 +88,29 @@ using (auth.uid() = user_id);
 drop policy if exists "Users can insert own items" on public.items;
 create policy "Users can insert own items"
 on public.items for insert
-with check (auth.uid() = user_id);
+with check (
+  auth.uid() = user_id
+  and exists (
+    select 1
+    from public.categories
+    where categories.id = items.category_id
+      and categories.user_id = auth.uid()
+  )
+);
 
 drop policy if exists "Users can update own items" on public.items;
 create policy "Users can update own items"
 on public.items for update
 using (auth.uid() = user_id)
-with check (auth.uid() = user_id);
+with check (
+  auth.uid() = user_id
+  and exists (
+    select 1
+    from public.categories
+    where categories.id = items.category_id
+      and categories.user_id = auth.uid()
+  )
+);
 
 drop policy if exists "Users can delete own items" on public.items;
 create policy "Users can delete own items"

@@ -18,7 +18,7 @@ export type MarkdownImportRow = {
 };
 
 function cleanCell(value: string | undefined) {
-  const trimmed = (value ?? "").trim();
+  const trimmed = unescapeMarkdownCell(value ?? "").trim();
   return trimmed === "-" ? "" : trimmed;
 }
 
@@ -38,12 +38,39 @@ function stripEmojiHeading(heading: string) {
 }
 
 function splitMarkdownRow(line: string) {
-  return line
+  const body = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  const cells: string[] = [];
+  let current = "";
+  let escaped = false;
+
+  for (const char of body) {
+    if (char === "|" && !escaped) {
+      cells.push(current.trim());
+      current = "";
+      continue;
+    }
+
+    current += char;
+    escaped = char === "\\" && !escaped;
+    if (char !== "\\") {
+      escaped = false;
+    }
+  }
+
+  cells.push(current.trim());
+  return cells;
+}
+
+function escapeMarkdownCell(value: string | null | undefined) {
+  return (value ?? "")
     .trim()
-    .replace(/^\|/, "")
-    .replace(/\|$/, "")
-    .split("|")
-    .map((cell) => cell.trim());
+    .replace(/\\/g, "\\\\")
+    .replace(/\r?\n/g, "<br>")
+    .replace(/\|/g, "\\|");
+}
+
+function unescapeMarkdownCell(value: string) {
+  return value.replace(/<br\s*\/?>/gi, "\n").replace(/\\([\\|])/g, "$1");
 }
 
 export function parseInventoryMarkdown(markdown: string): MarkdownImportRow[] {
@@ -116,7 +143,7 @@ function markdownDate(value: string | null) {
 }
 
 function markdownText(value: string | null | undefined) {
-  return value?.trim() || "";
+  return escapeMarkdownCell(value);
 }
 
 export function exportInventoryMarkdown(categories: Category[], items: InventoryItem[]) {
@@ -146,21 +173,18 @@ export function exportInventoryMarkdown(categories: Category[], items: Inventory
     }
 
     for (const item of categoryItems) {
-      lines.push(
-        [
-          "|",
-          markdownText(item.name),
-          markdownDate(item.purchase_date),
-          markdownAmount(item.amount_cents),
-          item.status,
-          item.pricing_method,
-          item.usage_count || "-",
-          markdownAmount(item.sale_amount_cents),
-          markdownDate(item.retired_date),
-          markdownText(item.notes),
-          "|",
-        ].join(" | "),
-      );
+      const cells = [
+        markdownText(item.name),
+        markdownDate(item.purchase_date),
+        markdownAmount(item.amount_cents),
+        item.status,
+        item.pricing_method,
+        item.usage_count || "-",
+        markdownAmount(item.sale_amount_cents),
+        markdownDate(item.retired_date),
+        markdownText(item.notes),
+      ];
+      lines.push(`| ${cells.join(" | ")} |`);
     }
   }
 
